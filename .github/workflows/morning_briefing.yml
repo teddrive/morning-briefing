@@ -5,6 +5,9 @@ on:
     - cron: '0 2 * * *'  # 10am Singapore time (UTC+8)
   workflow_dispatch:      # Allows manual trigger for testing
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   send_briefing:
     runs-on: ubuntu-latest
