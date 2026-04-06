@@ -50,7 +50,37 @@ def get_tech_news():
     except Exception as e:
         return f"Could not fetch tech news: {str(e)}"
 
+def get_ai_news():
+    try:
+        url = (
+            "https://newsapi.org/v2/everything"
+            f"?q=artificial+intelligence+AI&language=en&sortBy=publishedAt&pageSize=5&apiKey={NEWS_API_KEY}"
+        )
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            return f"AI news unavailable (HTTP {response.status_code})"
+        articles = response.json().get("articles", [])
+        headlines = [f"- {a.get('title', 'Untitled')}" for a in articles[:5] if a.get("title")]
+        return "\n".join(headlines) if headlines else "No AI news available"
+    except Exception as e:
+        return f"Could not fetch AI news: {str(e)}"
 
+
+def get_singapore_news():
+    try:
+        url = (
+            "https://newsapi.org/v2/everything"
+            f"?q=Singapore&language=en&sortBy=publishedAt&pageSize=5&apiKey={NEWS_API_KEY}"
+        )
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            return f"Singapore news unavailable (HTTP {response.status_code})"
+        articles = response.json().get("articles", [])
+        headlines = [f"- {a.get('title', 'Untitled')}" for a in articles[:5] if a.get("title")]
+        return "\n".join(headlines) if headlines else "No Singapore news available"
+    except Exception as e:
+        return f"Could not fetch Singapore news: {str(e)}"
+        
 def get_crypto_prices():
     try:
         url = (
@@ -127,8 +157,7 @@ def get_stock_overview():
         return f"Could not fetch stock data: {str(e)}"
 
 
-def get_briefing(tech_news, crypto, top_news, stocks):
-    # Trim each section to avoid exceeding model input limits
+def get_briefing(tech_news, crypto, top_news, stocks, ai_news, singapore_news):
     def trim(text, max_chars=800):
         return text[:max_chars] + "..." if len(text) > max_chars else text
 
@@ -137,11 +166,17 @@ def get_briefing(tech_news, crypto, top_news, stocks):
 LIVE TECH HEADLINES:
 {trim(tech_news)}
 
+LIVE AI NEWS:
+{trim(ai_news)}
+
 LIVE CRYPTO PRICES:
 {trim(crypto)}
 
 LIVE WORLD HEADLINES:
 {trim(top_news)}
+
+LIVE SINGAPORE NEWS:
+{trim(singapore_news)}
 
 LIVE US EQUITIES:
 {trim(stocks)}
@@ -149,16 +184,18 @@ LIVE US EQUITIES:
 Format your response as:
 
 1. Tech News — top 3-5 stories today
-2. Crypto — BTC, TRUMP token, DOGE: price, sentiment, key news
-3. World News — only the 2-3 most critical global stories
-4. US Equities — market overview + key movers across all sectors (exclude commodities), include pre-market signals if available
+2. AI News — all notable AI developments today
+3. Crypto — BTC, TRUMP token, DOGE: price, sentiment, key news
+4. World News — only the 2-3 most critical global stories
+5. Singapore News — top 3 Singapore stories today
+6. US Equities — market overview + key movers across all sectors (exclude commodities), include pre-market signals if available
 
 Keep it sharp and digestible."""
 
     client  = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1024,
+        max_tokens=1500,
         messages=[{"role": "user", "content": prompt}]
     )
     return message.content[0].text
@@ -193,20 +230,23 @@ def send_telegram_message(text, retries=1):
 def morning_briefing():
     print("Fetching live data in parallel...")
 
-    # Fetch all data sources simultaneously for speed
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future_tech   = executor.submit(get_tech_news)
-        future_crypto = executor.submit(get_crypto_prices)
-        future_news   = executor.submit(get_top_news)
-        future_stocks = executor.submit(get_stock_overview)
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        future_tech      = executor.submit(get_tech_news)
+        future_crypto    = executor.submit(get_crypto_prices)
+        future_news      = executor.submit(get_top_news)
+        future_stocks    = executor.submit(get_stock_overview)
+        future_ai        = executor.submit(get_ai_news)
+        future_singapore = executor.submit(get_singapore_news)
 
-        tech_news = future_tech.result()
-        crypto    = future_crypto.result()
-        top_news  = future_news.result()
-        stocks    = future_stocks.result()
+        tech_news     = future_tech.result()
+        crypto        = future_crypto.result()
+        top_news      = future_news.result()
+        stocks        = future_stocks.result()
+        ai_news       = future_ai.result()
+        singapore_news= future_singapore.result()
 
     print("Generating briefing with Claude...")
-    briefing     = get_briefing(tech_news, crypto, top_news, stocks)
+    briefing     = get_briefing(tech_news, crypto, top_news, stocks, ai_news, singapore_news)
     full_message = f"🌅 Good Morning! Here's your briefing:\n\n{briefing}"
     send_telegram_message(full_message)
     print("Done!")
