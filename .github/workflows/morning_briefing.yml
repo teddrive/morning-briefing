@@ -2,7 +2,7 @@ name: Morning Briefing
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 10am Singapore time (UTC+8)
+   - cron: '0 1 * * *'  # Targets 10am SGT (UTC+8), scheduled early to compensate for GitHub delays
   workflow_dispatch:      # Allows manual trigger for testing
 
 env:
